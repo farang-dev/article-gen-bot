@@ -1,30 +1,43 @@
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
-import os
-from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Initialize OpenAI API key from environment variable
-api_key = os.getenv("OPENAI_API_KEY")
 
 # Streamlit sidebar: OpenAI API Key Input
 st.sidebar.title("OpenAI API Key")
-if api_key:
+
+if "api_key" not in st.session_state:
+    st.session_state.api_key = None
+
+if st.session_state.api_key:
     st.sidebar.success("API Key Loaded!")
+    # Add a way to view the first few characters of the API key
+    masked_key = st.session_state.api_key[:5] + "*" * (len(st.session_state.api_key) - 5)
+    st.sidebar.text(f"Current key: {masked_key}")
+    if st.sidebar.button("Logout"):
+        st.session_state.api_key = None
+        st.rerun()
 else:
     api_key_input = st.sidebar.text_input("Enter your OpenAI API Key", type="password")
     if api_key_input:
-        # Save API key to .env file for future use
-        with open(".env", "w") as f:
-            f.write(f"OPENAI_API_KEY={api_key_input}")
-        st.sidebar.success("API Key Saved! Please refresh the page.")
-        st.stop()  # Stop execution to reload with the new key
+        # Trim any whitespace from the input
+        api_key_input = api_key_input.strip()
+        st.session_state.api_key = api_key_input
+        st.sidebar.success("API Key Saved for this session!")
+        st.rerun()
+
+if not st.session_state.api_key:
+    st.warning("Please enter your OpenAI API Key in the sidebar to continue.")
+    st.stop()
 
 # Initialize OpenAI client
-client = OpenAI(api_key=api_key)
+try:
+    client = OpenAI(api_key=st.session_state.api_key)
+    # Test the API key with a simple request
+    client.models.list()
+    st.sidebar.success("API Key is valid!")
+except Exception as e:
+    st.sidebar.error(f"Error with API Key: {str(e)}")
+    st.stop()
 
 # Sidebar: Input Options
 st.sidebar.header("Article Parameters")
@@ -33,7 +46,7 @@ article_length = st.sidebar.slider("Select Article Length (words)", 500, 2000, s
 tone = st.sidebar.selectbox("Select Tone", ["Formal", "Friendly", "Technical", "Conversational"])
 
 # Main Window: Keyword Input Section
-st.title("article/seo content generator")
+st.title("article content gen")
 
 if input_method == "Manual Input":
     keywords = st.text_area("Enter Keywords (comma-separated)", placeholder="e.g., marketing, SEO, AI content")
